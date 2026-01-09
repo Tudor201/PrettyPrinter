@@ -31,6 +31,13 @@ is_void_tag() {
   esac
 }
 
+is_raw_tag() {
+  case "$1" in
+    script|style|pre|textarea) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 is_decl_or_comment() {
   case "$1" in
     '<!'*| '<?'* ) return 0 ;;  
@@ -80,6 +87,39 @@ while [[ -n "$content" ]]; do
     fi
 
     extract_tag_name "$tag_trimmed"
+
+    if [[ -n "${TAG_NAME:-}" ]] && is_raw_tag "$TAG_NAME"; then
+      ((++indent))
+
+      close_tag="</$TAG_NAME>"
+
+      if [[ "$content" == *"$close_tag"* ]]; then
+        raw_content="${content%%$close_tag*}"
+        content="${content#"$raw_content"}"
+      else
+        raw_content="$content"
+        content=""
+      fi
+
+      if [[ -n "$raw_content" ]]; then
+        while IFS= read -r line; do
+          print_indent
+          echo "$line"
+        done <<< "$raw_content"
+      fi
+
+      if [[ "$content" == "$close_tag"* ]]; then
+        content="${content#"$close_tag"}"
+        ((indent--))
+        print_indent
+        echo "$close_tag"
+      else
+        ((indent--))
+      fi
+
+      continue
+    fi
+
     if [[ -n "${TAG_NAME:-}" ]] && is_void_tag "$TAG_NAME"; then
       continue
     fi
